@@ -1,0 +1,426 @@
+---
+title: "Agoda Instagram Data"
+author: "Ade"
+date: '2022-06-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+```
+
+
+```{r}
+library(dplyr) #Deeplayer manipulation
+library(lubridate) #Date Cleansing
+library(readxl) #library for read excel documents
+library(cld3) #library for detecting language
+library(tidyverse) #library for string manipulation
+library(googlesheets4) #library to access googlesheets
+
+#install.packages("tidyverse")
+#install.packages("cld3") package for language NLP
+#install.packages("googlesheets4")
+```
+
+
+```{r}
+#Clear the Environtment List.
+#rm(list=ls())
+```
+
+
+```{r}
+#Read the Excel data and put it into variable named Follower.
+Follower <- read_xlsx ("IG Follower Scraping.xlsx")
+```
+
+
+```{r}
+#Read the Excel data and put it into variable named Post.
+Post <- read_xlsx ("IG Post Scraping.xlsx")
+```
+
+
+```{r}
+#Check the Head of the Follower data.
+head(Follower)
+```
+
+
+```{r}
+#Check the Head of the Post data.
+head(Post)
+```
+
+
+### Transform the Post Data
+
+
+```{r}
+#Try to count the total post of every brands and grouping by Name.
+Post %>% 
+  group_by(Name) %>% 
+  count(name="Total Post")
+```
+
+
+```{r}
+#Try to filter the data based on name "Agoda".
+AgodaPost <- Post %>% 
+  filter(Name == "agoda")
+```
+
+
+```{r}
+#Try to count the total data based on name "Agoda".
+AgodaPost %>% 
+  group_by(Name) %>% 
+  count()
+```
+
+<!-- ### Cleansing Data -->
+<!-- AgodaPost %>% -->
+<!--   mutate(my_date = Date + hours(7)) %>% #Convert Date into GMT +7 -->
+<!--   relocate(my_date, .after=Date) -->
+
+```{r}
+AgodaPost <- AgodaPost %>% 
+  mutate(Date = Date + hours(7))  #Convert Date into GMT +7.
+  #relocate(Date, .after=Date)
+```
+
+
+```{r}
+AgodaPost #Check the update
+```
+
+
+```{r}
+#Make New Variables to store the new data and change the Likes and Comment into Engagement.
+NAgodaPost <- 
+AgodaPost %>%
+  select(-c(Platform)) %>% 
+  mutate(Engagement = `Likes and Comment`) %>%
+  relocate(Engagement, .before = Link ) %>% 
+  select(-`Likes and Comment`)
+```
+
+
+```{r}
+NAgodaPost #Check the update
+```
+
+
+```{r}
+#Relocate into temp variable 
+#NAgodaPost %>% 
+#   mutate(full_date = Date) %>% 
+#   relocate(full_date, .after = Date) %>% 
+#   mutate(temp = date(Date)) %>% 
+#   relocate(temp, .after = Date)
+
+#Relocate the full_date position and overwrite the value in the Variable.
+NAgodaPost <- NAgodaPost %>% 
+  mutate(Full_Date = Date) %>% 
+  relocate(Full_Date, .after = Date) %>% 
+  mutate(Date = date(Date))
+```
+
+
+```{r}
+NAgodaPost #New Agoda Post after Cleansing.
+```
+
+
+```{r}
+#Use the cdl3 package to detect the language of the captions
+Lang <- detect_language(NAgodaPost$Caption)
+```
+
+```{r}
+#Convert the values of Lang to data
+Lang %>% 
+  tibble::as_tibble() %>% 
+  mutate_if(is.character, as.character)
+```
+
+```{r}
+#Put the data of Lang to NAgodaPost, make a column name Language as container and relocate the column after the Name
+NAgodaPost <- NAgodaPost %>% 
+  mutate(Language = Lang) %>%  
+  relocate(Language, .after = Name)
+```
+
+```{r}
+NAgodaPost #Check the update
+```
+
+```{r}
+#Check Grouping of Language and Count it
+NAgodaPost %>% 
+  group_by(Language) %>% 
+  count(Language, name = "Total") %>% 
+  arrange(desc(Total))
+```
+
+
+```{r}
+#Add String to the Links with "media/size=l"
+NAgodaPost <- 
+  NAgodaPost %>% 
+  mutate(Image = paste0(Link, "media/size=l"))
+```
+
+```{r}
+NAgodaPost #Check The Data
+```
+
+
+```{r}
+summary(NAgodaPost) #Check Summary
+```
+
+
+```{r}
+#Make a new column named Years and fill it with year from the date.
+NewAgodaPost <- NAgodaPost %>% 
+  mutate( Years = year(ymd(NAgodaPost$Date))) %>% 
+  relocate(Years, .after = Date)
+```
+
+
+```{r}
+NewAgodaPost #Check the Data after addition of a new column
+```
+
+
+```{r}
+#Filter data with only year 2022 data
+NewAgodaPost22 <- NewAgodaPost %>% 
+  filter(Years == 2022)
+```
+
+
+```{r}
+#Count the total data of 2022 period after filtering
+NewAgodaPost22 %>% 
+  group_by(Years) %>% 
+  count()
+```
+
+
+```{r}
+NewAgodaPost22 #Check the Data
+```
+
+
+```{r}
+#Edit the "ms" into "id" as correcting the data after using cld3 library
+NewAgodaPost22 <- NewAgodaPost22 %>% 
+  # mutate(Language = as.character(Language)) %>% 
+  mutate(Language = case_when(Language == "ms" ~ "id", TRUE ~ Language))
+```
+
+
+```{r}
+NewAgodaPost22 #Crosscheck the Data
+```
+
+
+```{r}
+#Trying to filter the data that is NA, but have caption and fill it with "en" in Language column
+FinalAgodaPost22 <- NewAgodaPost22 %>% 
+  # mutate(Language = as.character(Language)) %>% 
+  mutate(Language = case_when(is.na(Language) & str_detect(Caption, 'More|Women') ~ "en", TRUE ~ Language))
+```
+
+
+```{r}
+FinalAgodaPost22
+```
+
+
+```{r}
+#Trying to filter the data that is NA, but have caption and fill it with "id" in Language column
+FinalAgodaPost22 <- FinalAgodaPost22 %>% 
+  # mutate(Language = as.character(Language)) %>% 
+  mutate(Language = case_when(is.na(Language) ~ "id", TRUE ~ Language))
+```
+
+
+```{r}
+FinalAgodaPost22
+```
+
+
+```{r}
+#Filter the data, drop the data with no caption
+FinalAgodaPost22 <- FinalAgodaPost22 %>% 
+  filter(Language != "ig")
+```
+
+
+```{r}
+#check the distribution of language
+FinalAgodaPost22 %>% 
+  group_by(Language) %>%
+  count()
+```
+
+
+```{r}
+FinalAgodaPost22 #Data after cleansing
+```
+
+
+```{r}
+#Change the agoda into Agoda Global or AgodaID based on language and drop the language column
+CleanAgodaPost <- FinalAgodaPost22 %>% 
+  mutate(Name = case_when(Language == "en" ~ "Agoda Global", TRUE ~ "AgodaID")) %>% 
+  select(-c(Language))
+```
+
+
+```{r}
+CleanAgodaPost #Agoda Post that already have differentiation of Global and ID post.
+```
+
+
+```{r}
+#create Hours column to separate the hour value.
+CleanAgodaPost <- CleanAgodaPost %>% 
+  mutate(Hours = hour(Full_Date)) %>% 
+  relocate(Hours, .after = Full_Date)
+```
+
+
+```{r}
+CleanAgodaPost #check the update
+```
+
+
+### Transform the Follower Data
+
+
+```{r}
+#Make new variable named AgodaFollower and assign it with Follower data consist of Date, Agoda 10 and Agoda 11
+AgodaFollower <-
+Follower %>% 
+  select(Date, agoda...10, agoda...11)
+```
+
+
+```{r}
+colnames(AgodaFollower) <- c("Date", "Agoda Global", "AgodaID")
+
+AgodaFollower #Rename Column Name of Agoda 10 and Agoda 11.
+```
+
+
+```{r}
+#Select the follower and change the name into Agoda Global.
+AgodaGlobal <- AgodaFollower %>% 
+  select(Date, `Agoda Global`) %>% 
+  mutate(Follower = `Agoda Global`) %>% 
+  select(Date, Follower) %>% 
+  mutate(Name = "Agoda Global")
+
+#Select the follower and change the name into AgodaID.
+AgodaID <- AgodaFollower %>% 
+  select(Date, AgodaID) %>% 
+  mutate(Follower = AgodaID) %>% 
+  select(Date, Follower) %>% 
+  mutate(Name = "AgodaID")
+
+#The process of joining Agoda Global and AgodaID.
+FinalAgodaFoll <-
+  rbind(AgodaGlobal,
+        AgodaID)
+```
+
+
+```{r}
+FinalAgodaFoll #Result of Joining of Agoda Global and AgodaID.
+```
+
+
+```{r}
+#Make new Variable named Years, which contains Years Only and relocate it after Date.
+FinalAgodaFoll <- FinalAgodaFoll %>% 
+  mutate( Years = year(ymd(FinalAgodaFoll$Date))) %>% 
+  relocate(Years, .after = Date)
+```
+
+
+```{r}
+#Count Final Agoda Follower, grouping by Years
+FinalAgodaFoll %>% 
+  group_by(Years) %>% 
+  count()
+```
+
+
+```{r}
+FinalAgodaFoll #check the New updated data.
+```
+
+
+```{r}
+#Filter the data that is not from 2022
+FinalAgodaFoll22 <- FinalAgodaFoll %>% 
+  filter(Years == 2022)
+```
+
+
+```{r}
+#Check the count on the new data.
+FinalAgodaFoll22 %>% 
+  group_by(Years) %>% 
+  count()
+```
+
+
+```{r}
+FinalAgodaFoll22 #view the data.
+```
+
+
+#####
+
+#Load Data
+
+
+```{r}
+#Input JSON from API Key.
+gs4_auth(path = "salt-ade-8408c26e8760.json")
+```
+
+
+```{r}
+#Assign the Docs into Variable gsheets.
+gsheets <- gs4_get("https://docs.google.com/spreadsheets/d/17oxqFtT-6CDy9nbEzuEjnBBUxtw8GBPcA3pm8aJNWyE/edit#gid=0")
+```
+
+
+```{r}
+#Put the Data to the Sheets name "Ade" in the test Google Sheets we have.
+range_write(gsheets,
+            CleanAgodaPost,
+            sheet = "Posts")
+```
+
+
+```{r}
+range_write(gsheets,
+            FinalAgodaFoll22,
+            sheet = "Followers")
+```
+
+
+
+
+
+
+
