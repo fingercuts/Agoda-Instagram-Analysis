@@ -26,19 +26,6 @@ The goal of this project is to:
 
 ---
 
-## 📂 Repository Structure  
-
-├── code/
-│   └── agoda_instagram_analysis.Rmd   # Main RMarkdown file
-├── deck/
-│   └── agoda_instagram_analysis.pdf   # Presentation slides
-├── data/ (not included here)
-│   └── agoda - Instagram - Analysis
-└── README.md
-
-
----
-
 ## 📊 Data Sources  
 - **IG Follower Scraping.xlsx** → Daily follower count from multiple Agoda accounts  
 - **IG Post Scraping.xlsx** → Post-level data including captions, likes, comments, and posting time  
